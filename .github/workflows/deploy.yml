@@ -1,0 +1,72 @@
+name: Build and Deploy namegen to EKS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: namegen-app
+  EKS_CLUSTER_NAME: namegen-cluster
+  K8S_NAMESPACE: namegen
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag and push image to ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Update kubeconfig for EKS
+        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/00-namespace.yaml
+          kubectl apply -f k8s/01-mongodb-secret.yaml
+          kubectl apply -f k8s/02-mongodb-init-configmap.yaml
+          kubectl apply -f k8s/03-mongodb-service.yaml
+          kubectl apply -f k8s/03b-storageclass.yaml
+          kubectl apply -f k8s/04-mongodb-statefulset.yaml
+          kubectl apply -f k8s/05-app-deployment.yaml
+          kubectl apply -f k8s/06-app-service-nlb.yaml
+
+      - name: Deploy new image and wait for rollout
+        env:
+          IMAGE: ${{ steps.build-image.outputs.image }}
+        run: |
+          kubectl set image deployment/namegen-app namegen-app=$IMAGE -n ${{ env.K8S_NAMESPACE }}
+          kubectl rollout status deployment/namegen-app -n ${{ env.K8S_NAMESPACE }} --timeout=180s
+
+      - name: Show service endpoint (NLB)
+        run: |
+          kubectl get svc namegen-app-nlb -n ${{ env.K8S_NAMESPACE }}

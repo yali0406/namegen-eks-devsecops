@@ -1,0 +1,22 @@
+# EKS Auto Mode does NOT create a StorageClass automatically - it must be
+# created explicitly, referencing the Auto Mode EBS provisioner
+# "ebs.csi.eks.amazonaws.com" (NOT the legacy in-tree "kubernetes.io/aws-ebs"
+# that EKS creates by default as "gp2", which has no controller watching it
+# in Auto Mode and would leave PVCs stuck in Pending forever).
+# Docs: https://docs.aws.amazon.com/eks/latest/userguide/create-storage-class.html
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: auto-ebs-sc
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+allowedTopologies:
+  - matchLabelExpressions:
+      - key: eks.amazonaws.com/compute-type
+        values:
+          - auto
+provisioner: ebs.csi.eks.amazonaws.com
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  type: gp3
+  encrypted: "true"

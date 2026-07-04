@@ -1,0 +1,17 @@
+# Headless service - required for a StatefulSet, and gives the app a stable
+# DNS name "mongodb" to connect to (matches MONGODB_URL host: .../@mongodb/...)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: namegen
+  labels:
+    app: mongodb
+spec:
+  clusterIP: None
+  selector:
+    app: mongodb
+  ports:
+    - port: 27017
+      targetPort: 27017
+      name: mongodb

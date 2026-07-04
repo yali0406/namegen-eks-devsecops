@@ -1,0 +1,54 @@
+# Node.js "namegen" app deployment.
+# IMPORTANT: replace <ECR_IMAGE_URI> with your ECR image, e.g.:
+#   123456789012.dkr.ecr.us-east-1.amazonaws.com/namegen-app:latest
+# The CI/CD pipeline (.github/workflows/deploy.yml) does this substitution
+# automatically on every push to main.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: namegen-app
+  namespace: namegen
+  labels:
+    app: namegen-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: namegen-app
+  template:
+    metadata:
+      labels:
+        app: namegen-app
+    spec:
+      containers:
+        - name: namegen-app
+          image: 071035554605.dkr.ecr.us-east-1.amazonaws.com/namegen-app:v1
+          ports:
+            - containerPort: 8080
+          env:
+            - name: MONGODB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mongodb-credentials
+                  key: MONGODB_URL
+            - name: SERVER_PORT
+              value: "8080"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20

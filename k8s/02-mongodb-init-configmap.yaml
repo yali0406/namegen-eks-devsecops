@@ -1,0 +1,17 @@
+# Runs automatically the first time the MongoDB container starts (empty data
+# directory), via the official image's /docker-entrypoint-initdb.d mechanism.
+# It creates the "genuser" user, scoped to the "namegen" database, matching
+# the required MONGODB_URL=mongodb://genuser:password@mongodb/namegen
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-init-script
+  namespace: namegen
+data:
+  init-mongo.js: |
+    db = db.getSiblingDB('namegen');
+    db.createUser({
+      user: 'genuser',
+      pwd: 'password',
+      roles: [{ role: 'readWrite', db: 'namegen' }]
+    });

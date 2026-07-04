@@ -1,0 +1,32 @@
+# EKS Auto Mode cluster definition for the namegen final project
+# Docs: https://eksctl.io/usage/auto-mode/
+#
+# Create the cluster:
+#   eksctl create cluster -f eksctl/cluster.yaml
+#
+# Delete the cluster (IMPORTANT - avoid ongoing AWS charges when you are done):
+#   eksctl delete cluster -f eksctl/cluster.yaml
+
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: namegen-cluster
+  region: us-east-1
+  version: "1.31"
+  tags:
+    project: namegen-devsecops-final
+
+# EKS Auto Mode: AWS manages the data plane (nodes, autoscaling), the AWS
+# Load Balancer Controller (needed for the NLB) and the EBS CSI driver
+# (needed for the MongoDB PersistentVolume) are all built in - no extra
+# add-ons to install, and no nodeGroups / managedNodeGroups to define.
+autoModeConfig:
+  enabled: true
+  # Default Auto Mode node pools:
+  #  - system:            for core cluster add-ons (CoreDNS, controllers, etc.)
+  #  - general-purpose:    for our application + MongoDB pods
+  nodePools: [general-purpose, system]
+
+iam:
+  withOIDC: true
