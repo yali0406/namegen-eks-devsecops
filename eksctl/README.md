@@ -2,8 +2,10 @@
 
 This project provisions the EKS cluster with **eksctl** using **EKS Auto Mode**,
 so AWS manages the data plane (nodes, autoscaling), the AWS Load Balancer
-Controller (needed for the NLB) and the EBS CSI driver (needed for the
-MongoDB PersistentVolume) automatically - no extra add-ons to install.
+Controller (needed for the NLB) and the EBS storage integration (needed for
+the MongoDB PersistentVolume) automatically - no extra add-ons to install.
+Note: Auto Mode still requires a `StorageClass` to be created explicitly
+(see `k8s/03b-storageclass.yaml`) - it does not create a default one.
 
 ## Prerequisites
 
